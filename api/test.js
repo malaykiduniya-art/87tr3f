@@ -36,8 +36,9 @@ export default async function handler(req, res) {
     const levelData = await levelRes.json();
 
     // --- 4. REMOVE UNWANTED FIELDS ---
-    // We delete these keys so they don't appear in the final JSON
+    // This list includes the previous requests plus the new ones
     const keysToRemove = [
+      // Batch 1
       "officialSong", 
       "ldm", 
       "partialDiff", 
@@ -48,13 +49,14 @@ export default async function handler(req, res) {
       "mythic", 
       "featured", 
       "featuredPosition",
-      "cp", 
+      // Batch 2 (New)
+      "cp",
       "disliked",
       "editorTime",
       "totalEditorTime",
       "gameVersion",
-      "copiedID", 
-      "songSize
+      "copiedID",
+      "songSize"
     ];
 
     keysToRemove.forEach(key => delete levelData[key]);
