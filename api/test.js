@@ -53,7 +53,6 @@ export default async function handler(req, res) {
     // We define 'thumbnail' first so it appears at the top of the JSON
     const fullResponse = {
       thumbnail: validThumbnail, 
-      song_url: songUrl,
       
       // Spread the rest of the GDBrowser data below
       ...levelData
