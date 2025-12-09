@@ -19,38 +19,27 @@ export default async function handler(req, res) {
   }
 
   try {
-    // --- 2. FETCH BASIC LEVEL DATA ---
-    const levelRes = await fetch(`https://gdbrowser.com/api/level/${id}`);
-    
+    const targetThumbUrl = `https://levelthumbs.prevter.me/thumbnail/${id}/high`;
+
+    // --- 2. PARALLEL FETCHING ---
+    // We fetch the Level Data and check the Thumbnail at the same time for maximum speed.
+    const [levelRes, thumbRes] = await Promise.all([
+      fetch(`https://gdbrowser.com/api/level/${id}`),
+      fetch(targetThumbUrl, { method: 'HEAD' }).catch(() => null) // Catch network errors on image check
+    ]);
+
+    // --- 3. VALIDATE LEVEL DATA ---
     if (!levelRes.ok) {
       return res.status(levelRes.status).json({ error: 'Level not found or GDBrowser error' });
     }
 
     const levelData = await levelRes.json();
-    const authorName = levelData.author;
-    
-    // Define the potential thumbnail URL
-    const targetThumbUrl = `https://levelthumbs.prevter.me/thumbnail/${id}/high`;
 
-    // --- 3. PREPARE PARALLEL REQUESTS ---
-    const requests = [
-      // A. Fetch Author Profile
-      fetch(`https://gdbrowser.com/api/profile/${authorName}`)
-        .then(r => r.ok ? r.json() : null).catch(() => null),
+    // --- 4. VALIDATE THUMBNAIL ---
+    // If the thumbnail request was successful (status 200-299), use the URL. Otherwise, null.
+    const validThumbnail = (thumbRes && thumbRes.ok) ? targetThumbUrl : null;
 
-      // B. Fetch Top Comments (First Page)
-      fetch(`https://gdbrowser.com/api/comments/${id}?count=20`)
-        .then(r => r.ok ? r.json() : []).catch(() => []),
-
-      // C. Check if Thumbnail Exists (HEAD request is faster, doesn't download the image)
-      fetch(targetThumbUrl, { method: 'HEAD' })
-        .then(r => r.ok ? targetThumbUrl : null).catch(() => null)
-    ];
-
-    // Wait for all data to arrive
-    const [authorData, commentsData, verifiedThumbnail] = await Promise.all(requests);
-
-    // --- 4. GENERATE SONG LINK ---
+    // --- 5. GENERATE SONG LINK ---
     let songUrl = null;
     if (levelData.customSong >= 1) {
       if (levelData.songLink) {
@@ -60,23 +49,16 @@ export default async function handler(req, res) {
       }
     }
 
-    // --- 5. CONSTRUCT RESPONSE ---
+    // --- 6. CONSTRUCT RESPONSE ---
     const fullResponse = {
-      // Standard level data
+      // Spread all standard GDBrowser data (stars, difficulty, description, etc.)
       ...levelData,
 
-      // Extras
+      // Add our specific extras
       extras: {
-        // This will be the URL if found, or null if not found
-        thumbnail_url: verifiedThumbnail, 
+        thumbnail_url: validThumbnail,
         song_url: songUrl,
-        level_url: `https://gdbrowser.com/${id}`,
-      },
-
-      // Extended info (Leaderboard removed)
-      extended_info: {
-        author_profile: authorData || { error: "Profile not found" },
-        comments: commentsData
+        level_url: `https://gdbrowser.com/${id}`
       }
     };
 
