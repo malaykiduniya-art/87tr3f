@@ -22,7 +22,6 @@ export default async function handler(req, res) {
     const targetThumbUrl = `https://levelthumbs.prevter.me/thumbnail/${id}/high`;
 
     // --- 2. PARALLEL FETCHING ---
-    // Fetch Level Data and check Thumbnail existence simultaneously
     const [levelRes, thumbRes] = await Promise.all([
       fetch(`https://gdbrowser.com/api/level/${id}`),
       fetch(targetThumbUrl, { method: 'HEAD' }).catch(() => null)
@@ -33,13 +32,30 @@ export default async function handler(req, res) {
       return res.status(levelRes.status).json({ error: 'Level not found or GDBrowser error' });
     }
 
+    // Get the data object
     const levelData = await levelRes.json();
 
-    // --- 4. VALIDATE THUMBNAIL ---
-    // If the thumbnail request was successful (status 200), use the URL. Otherwise null.
+    // --- 4. REMOVE UNWANTED FIELDS ---
+    // We delete these keys so they don't appear in the final JSON
+    const keysToRemove = [
+      "officialSong", 
+      "ldm", 
+      "partialDiff", 
+      "difficultyFace", 
+      "epic", 
+      "epicValue", 
+      "legendary", 
+      "mythic", 
+      "featured", 
+      "featuredPosition"
+    ];
+
+    keysToRemove.forEach(key => delete levelData[key]);
+
+    // --- 5. VALIDATE THUMBNAIL ---
     const validThumbnail = (thumbRes && thumbRes.ok) ? targetThumbUrl : null;
 
-    // --- 5. GENERATE SONG LINK ---
+    // --- 6. GENERATE SONG LINK ---
     let songUrl = null;
     if (levelData.customSong >= 1) {
       if (levelData.songLink) {
@@ -49,12 +65,10 @@ export default async function handler(req, res) {
       }
     }
 
-    // --- 6. CONSTRUCT RESPONSE ---
-    // We define 'thumbnail' first so it appears at the top of the JSON
+    // --- 7. CONSTRUCT RESPONSE ---
     const fullResponse = {
-      thumbnail: validThumbnail, 
-      
-      // Spread the rest of the GDBrowser data below
+      thumbnail: validThumbnail,
+      song_url: songUrl,
       ...levelData
     };
 
