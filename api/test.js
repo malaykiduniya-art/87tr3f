@@ -20,7 +20,6 @@ export default async function handler(req, res) {
 
   try {
     // --- 2. FETCH BASIC LEVEL DATA ---
-    // We fetch this first because we need the 'author' name for the next step
     const levelRes = await fetch(`https://gdbrowser.com/api/level/${id}`);
     
     if (!levelRes.ok) {
@@ -29,37 +28,31 @@ export default async function handler(req, res) {
 
     const levelData = await levelRes.json();
     const authorName = levelData.author;
+    
+    // Define the potential thumbnail URL
+    const targetThumbUrl = `https://levelthumbs.prevter.me/thumbnail/${id}/high`;
 
     // --- 3. PREPARE PARALLEL REQUESTS ---
-    // We define promises to fetch everything else simultaneously.
-    // We use .catch(() => null) so if one fails (e.g., no comments), the whole request doesn't fail.
-
     const requests = [
       // A. Fetch Author Profile
       fetch(`https://gdbrowser.com/api/profile/${authorName}`)
         .then(r => r.ok ? r.json() : null).catch(() => null),
 
-      // B. Fetch Level Leaderboard (Top 100)
-      fetch(`https://gdbrowser.com/api/leaderboardLevel/${id}`)
+      // B. Fetch Top Comments (First Page)
+      fetch(`https://gdbrowser.com/api/comments/${id}?count=20`)
         .then(r => r.ok ? r.json() : []).catch(() => []),
 
-      // C. Fetch Top Comments (First Page)
-      fetch(`https://gdbrowser.com/api/comments/${id}?count=20`)
-        .then(r => r.ok ? r.json() : []).catch(() => [])
+      // C. Check if Thumbnail Exists (HEAD request is faster, doesn't download the image)
+      fetch(targetThumbUrl, { method: 'HEAD' })
+        .then(r => r.ok ? targetThumbUrl : null).catch(() => null)
     ];
 
     // Wait for all data to arrive
-    const [authorData, leaderboardData, commentsData] = await Promise.all(requests);
+    const [authorData, commentsData, verifiedThumbnail] = await Promise.all(requests);
 
-    // --- 4. GENERATE EXTRA LINKS ---
-    
-    // Thumbnail
-    const thumbnailUrl = `https://levelthumbs.prevter.me/thumbnail/${id}/high`;
-
-    // Song URL (Direct download link)
+    // --- 4. GENERATE SONG LINK ---
     let songUrl = null;
     if (levelData.customSong >= 1) {
-      // Decode the URL if GDBrowser provided it, otherwise construct Newgrounds link
       if (levelData.songLink) {
         songUrl = decodeURIComponent(levelData.songLink);
       } else {
@@ -67,23 +60,23 @@ export default async function handler(req, res) {
       }
     }
 
-    // --- 5. CONSTRUCT THE MASSIVE JSON RESPONSE ---
+    // --- 5. CONSTRUCT RESPONSE ---
     const fullResponse = {
-      // Spread the original level data at the top level
+      // Standard level data
       ...levelData,
 
-      // Add our calculated extras
+      // Extras
       extras: {
-        thumbnail_url: thumbnailUrl,
+        // This will be the URL if found, or null if not found
+        thumbnail_url: verifiedThumbnail, 
         song_url: songUrl,
         level_url: `https://gdbrowser.com/${id}`,
       },
 
-      // Add the enriched fetched data
+      // Extended info (Leaderboard removed)
       extended_info: {
         author_profile: authorData || { error: "Profile not found" },
-        leaderboard: leaderboardData, // Array of players
-        comments: commentsData        // Array of comments
+        comments: commentsData
       }
     };
 
