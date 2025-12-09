@@ -47,7 +47,14 @@ export default async function handler(req, res) {
       "legendary", 
       "mythic", 
       "featured", 
-      "featuredPosition"
+      "featuredPosition",
+      "cp", 
+      "disliked",
+      "editorTime",
+      "totalEditorTime",
+      "gameVersion",
+      "copiedID", 
+      "songSize
     ];
 
     keysToRemove.forEach(key => delete levelData[key]);
