@@ -22,10 +22,10 @@ export default async function handler(req, res) {
     const targetThumbUrl = `https://levelthumbs.prevter.me/thumbnail/${id}/high`;
 
     // --- 2. PARALLEL FETCHING ---
-    // We fetch the Level Data and check the Thumbnail at the same time for maximum speed.
+    // Fetch Level Data and check Thumbnail existence simultaneously
     const [levelRes, thumbRes] = await Promise.all([
       fetch(`https://gdbrowser.com/api/level/${id}`),
-      fetch(targetThumbUrl, { method: 'HEAD' }).catch(() => null) // Catch network errors on image check
+      fetch(targetThumbUrl, { method: 'HEAD' }).catch(() => null)
     ]);
 
     // --- 3. VALIDATE LEVEL DATA ---
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
     const levelData = await levelRes.json();
 
     // --- 4. VALIDATE THUMBNAIL ---
-    // If the thumbnail request was successful (status 200-299), use the URL. Otherwise, null.
+    // If the thumbnail request was successful (status 200), use the URL. Otherwise null.
     const validThumbnail = (thumbRes && thumbRes.ok) ? targetThumbUrl : null;
 
     // --- 5. GENERATE SONG LINK ---
@@ -50,16 +50,13 @@ export default async function handler(req, res) {
     }
 
     // --- 6. CONSTRUCT RESPONSE ---
+    // We define 'thumbnail' first so it appears at the top of the JSON
     const fullResponse = {
-      // Spread all standard GDBrowser data (stars, difficulty, description, etc.)
-      ...levelData,
-
-      // Add our specific extras
-      extras: {
-        thumbnail_url: validThumbnail,
-        song_url: songUrl,
-        level_url: `https://gdbrowser.com/${id}`
-      }
+      thumbnail: validThumbnail, 
+      song_url: songUrl,
+      
+      // Spread the rest of the GDBrowser data below
+      ...levelData
     };
 
     return res.status(200).json(fullResponse);
